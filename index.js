@@ -1,28 +1,12 @@
+require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
+const Note = require('./models/note')
 const app = express()
+const ObjectId = require('mongoose').Types.ObjectId;
 app.use(cors())
 app.use(express.json())
-let notes = [
-          {
-            "id": 1,
-            "content": "HTML is easy",
-            "date": "2023-03-01",
-            "important": true
-          },
-          {
-            "id": 2,
-            "content": "Browser can execute only JavaScript",
-            "date": "2023-02-15",
-            "important": true
-          },
-          {
-            "id": 3,
-            "content": "GET and POST are the most important methods of HTTP protocol",
-            "date": "2023-02-15",
-            "important": true
-          }
-]
+
 
 const requestLogger = (request,response, next) => {
     console.log('Method',request.method);
@@ -38,61 +22,72 @@ app.get('/', (request,response) => {
 })
 
 app.get('/api/notes',(request,response) => {
-    response.json(notes)
+    Note.find({}).then(notes =>{
+        response.json(notes)
+    })
 })
 
-app.get('/api/notes/:id',(request, response) => {
-    const id = Number(request.params.id)
-    console.log(id)
-    const note = notes.find(x => x.id === id)
-    console.log(note)
-    if (note) {
-        response.json(note)
+function isValidObjectId(id){
+    
+    if(ObjectId.isValid(id)){
+        if((String)(new ObjectId(id)) === id)
+            return true;
+        return false;
     }
-    else{
-        response.status(404).send();
+    return false;
+}
+
+app.get('/api/notes/:id',(request, response) => {
+    if (isValidObjectId(request.params.id)){
+        Note.findById(request.params.id)
+        .then(note => {
+            note !== null ? response.json(note) : response.status(404).send()
+        })
+    }else{
+        response.status(404).send()
     }
 })
 
 app.delete('/api/notes/:id', (request, response)=>{
-    const id = Number(request.params.id)
-    let size = notes.length
-    notes = notes.filter(x => x.id !== id)
-    if(size > notes.length){
-        response.status(204).send()
+    if (isValidObjectId(request.params.id)){
+        Note.deleteOne({ _id : request.params.id})
+            .then(result => {
+              if(result.deletedCount > 0){
+                response.status(204).send()
+              }else{
+                response.status(404).send()
+              }
+            })
     }else{
         response.status(404).send()
     }
 })
 
 
-const generateId = () => {
-    const maxId = notes.length > 0
-        ? Math.max(...notes.map(x => x.id))
-        : 0
-    return maxId + 1
-}
-
 app.put('/api/notes/:id',(request, response) => {
-    const id = Number(request.params.id)
-    console.log(id)
-    const note = notes.find(x => x.id === id)
     const body = request.body;
     const noteUpdate = {
         content: body.content,
         important: body.important,
         date: body.date,
-        id: body.id
+        id : body.id,
+        _id : body._id,
     }
-    console.log(note)
-    if (note) {
-        notes = notes.map(x => x.id !== id ? x : noteUpdate)
-        response.json(noteUpdate)
+
+    if(isValidObjectId(request.params.id)){
+        Note.findOneAndUpdate({ _id : request.params.id},noteUpdate)
+          .then(
+              result => {
+              if(result !== null){
+                  response.json(noteUpdate)
+              }else{
+                  response.status(404).send()
+              }
+              })
+    }else{
+        response.status(404).send()
     }
-    else{
-        response.status(404).send();
-    }
-})
+    })
 
 app.post('/api/notes',(request, response) => {
     const body = request.body;
@@ -102,14 +97,15 @@ app.post('/api/notes',(request, response) => {
             error: 'content missing'
         })
     }
-    const note = {
+    const note = Note({
         content: body.content,
         important: body.important || false,
         date: new Date(),
-        id: generateId()
-    }
-    notes = notes.concat(note)
-    response.json(note)
+    })
+    note.save().then(savedNote => {
+        response.json(savedNote)
+    })
+    
 })
 
 const unknownPath = (request,response) => {
@@ -120,7 +116,7 @@ const unknownPath = (request,response) => {
 
 app.use(unknownPath)
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT
 app.listen(PORT,()=>{
     console.log(`Server running on port ${PORT}`)
 })
