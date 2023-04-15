@@ -1,5 +1,5 @@
 // mongodb+srv://fullstack:<password>@cluster0.dgdjwrw.mongodb.net/?retryWrites=true&w=majority
-
+require('dotenv').config()
 const mongoose = require('mongoose')
 
 const url = process.env.MONGODB_URI
