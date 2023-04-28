@@ -47,7 +47,7 @@ notesRouter.delete('/:id', (request, response, next) => {
 notesRouter.put('/:id', (request, response, next) => {
   const body = request.body
 
-  const updatedNote = {
+  const note = {
     content: body.content,
     important: body.important,
     date: body.date
